@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <style>
@@ -567,7 +568,8 @@ async parallel_analyze_content({ targets, prompt }) {
 
         if (role === 'assistant') {
             const wrapper = document.createElement('div');
-            wrapper.innerHTML = marked.parse(content || "");
+			const cleanHTML = DOMPurify.sanitize(marked.parse(content || ""));
+			wrapper.innerHTML = cleanHTML;
             wrapper.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
 				
 			// Add more styling to lists
