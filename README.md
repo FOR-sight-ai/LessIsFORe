@@ -5,6 +5,8 @@ It is a web-based interface with a simple agent loop and the minimal set of tool
 
 You must connect it to an open-ai compatible API and select a folder - it then allows to answer questions based on the content of that folder (compatible with PDFs, Docx, PPTX, and text).
 
+[Access it online here](https://for-sight-ai.github.io/LessIsFORe/LessIsFore.html)
+
 ---
 
 ## 🚀 Key Features
