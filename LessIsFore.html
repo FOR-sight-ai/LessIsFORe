@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Less is FORe.html - Minimalist agentic AI Assistant</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        /* --- Styles Originaux Conservés --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #ffffff 0%, #764ba2 100%);
+            min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 5px;
+        }
+        .container {
+            background: white; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%; height: 96vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 5px; text-align: center; }
+        .config-toggle, .open-folder-button, .clear-button {
+            background: rgba(255, 255, 255, 0.2); border: none; color: white; padding: 8px 16px;
+            border-radius: 8px; cursor: pointer; margin-top: 10px; font-size: 14px; transition: background 0.3s;
+        }
+        .config-panel { background: #f8f9fa; padding: 20px; border-bottom: 1px solid #e0e0e0; display: none; }
+        .config-panel.active { display: block; }
+        .config-field { margin-bottom: 15px; }
+        .config-field label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; }
+        .config-field input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .chat-container { flex: 1; overflow-y: auto; padding: 20px; background: #fafafa; }
+        .message { margin-bottom: 16px; display: flex; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { justify-content: flex-end; }
+        .message-content { max-width: 70%; padding: 12px 16px; border-radius: 16px; word-wrap: break-word; position: relative; }
+        .message.user .message-content { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .message.assistant .message-content { background: white; color: #333; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); padding-top: 40px; }
+        .copy-button {
+            position: absolute; top: 8px; right: 8px; background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.2); color: #667eea; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+        }
+
+        /* --- Nouveaux Styles pour les Outils --- */
+        .message.tool { justify-content: center; margin-bottom: 8px; }
+        .tool-content {
+            background: #f0f0f0; color: #666; font-family: monospace; font-size: 12px;
+            padding: 4px 12px; border-radius: 4px; border-left: 3px solid #764ba2;
+        }
+		
+		.pretty-list {
+			padding-left: 20px;
+			margin: 10px 0;
+		}
+		.pretty-list li {
+			margin: 5px 0;
+			list-style-type: disc;
+			list-style-position: inside;
+		}
+
+        /* Markdown & Inputs */
+        .message.assistant .message-content pre { background: #282c34; padding: 16px; border-radius: 8px; overflow-x: auto; color: #abb2bf; }
+        .input-container { padding: 20px; background: white; border-top: 1px solid #e0e0e0; display: flex; gap: 10px; }
+        .input-container textarea { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 12px; resize: none; min-height: 50px; }
+        .input-container button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; cursor: pointer; }
+        .typing-indicator { display: flex; gap: 4px; padding: 12px 16px; }
+        .typing-indicator span { width: 8px; height: 8px; border-radius: 50%; background: #999; animation: typing 1.4s infinite; }
+        @keyframes typing { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-10px); } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <button class="config-toggle" onclick="toggleConfig()">⚙️ Configuration</button>
+            <button class="clear-button" onclick="clearConversation()">🗑️ Clear Chat</button>
+            <button class="open-folder-button" onclick="pickDirectory()">📁 Open Folder</button>
+        </div>
+    </div>
+
+    <div class="config-panel" id="configPanel">
+        <div class="config-field">
+            <label for="apiAddress">API Address:</label>
+            <input type="text" id="apiAddress" placeholder="http://localhost:8000" value="http://localhost:8000">
+        </div>
+        <div class="config-field">
+            <label for="apiKey">API Key:</label>
+            <input type="password" id="apiKey" placeholder="Enter your API key" value="">
+        </div>
+        <div class="config-field">
+            <label for="modelName">Model Name:</label>
+            <input type="text" id="modelName" value="mistral">
+        </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer"></div>
+
+    <div class="input-container">
+        <textarea id="userInput" placeholder="Type your message..." onkeydown="handleKeyPress(event)"></textarea>
+        <button onclick="sendMessage()" id="sendBtn">Send</button>
+    </div>
+</div>
+
+<script>
+    let isLoading = false;
+    let conversationHistory = [];
+    let rootHandle = null;
+
+    marked.setOptions({
+        highlight: (code, lang) => (lang && hljs.getLanguage(lang)) ? hljs.highlight(code, { language: lang }).value : hljs.highlightAuto(code).value,
+        breaks: true, gfm: true
+    });
+
+    function toggleConfig() { document.getElementById('configPanel').classList.toggle('active'); }
+    function clearConversation() { conversationHistory = []; document.getElementById('chatContainer').innerHTML = ''; }
+
+    async function pickDirectory() {
+        try {
+            rootHandle = await window.showDirectoryPicker({ mode: "read" });
+            addMessage("Folder access granted (read-only): " + rootHandle.name+ "\n WARNING : be sure that you use a confidential LLM API", "assistant", "System: Folder ready.");
+        } catch (err) { alert("Directory access is required for file tools."); }
+    }
+
+    // --- TOOL DEFINITIONS ---
+	const FileLib = {
+		// Lecture PDF
+		async pdfToText(arrayBuffer) {
+			const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+			let text = "";
+			for (let i = 1; i <= pdf.numPages; i++) {
+				const page = await pdf.getPage(i);
+				const content = await page.getTextContent();
+				text += `[Page ${i}]\n` + content.items.map(s => s.str).join(" ") + "\n";
+			}
+			return text;
+		},
+
+		// Lecture XML pour DOCX/PPTX
+		async getOfficeXML(arrayBuffer, type) {
+			const zip = await JSZip.loadAsync(arrayBuffer);
+			const parser = new DOMParser();
+			
+			if (type === 'docx') {
+				const mainFile = "word/document.xml";
+				if (!zip.file(mainFile)) return "XML DOCX not found (word/document.xml).";
+				const xmlString = await zip.file(mainFile).async("string");
+				const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+				
+				// Dans Word, le texte est dans les balises <w:t>
+				const textNodes = xmlDoc.getElementsByTagName("w:t");
+				const fullText = Array.from(textNodes).map(node => node.textContent).join("");
+				
+				return fullText;
+			}
+
+			if (type === 'pptx') {
+				// 1. Lister tous les fichiers qui correspondent au pattern des slides
+				const slideFiles = Object.keys(zip.files).filter(name => 
+					name.startsWith("ppt/slides/slide") && name.endsWith(".xml")
+				);
+
+				if (slideFiles.length === 0) return "No slides found in PPTX.";
+
+				// 2. Trier les slides par numéro (slide1.xml, slide2.xml, etc.) 
+				// sinon JSZip risque de les renvoyer dans le désordre (ex: slide1, slide10, slide2)
+				slideFiles.sort((a, b) => {
+					const numA = parseInt(a.match(/\d+/)[0]);
+					const numB = parseInt(b.match(/\d+/)[0]);
+					return numA - numB;
+				});
+				let extractedText = `[Content of PPTX - ${slideFiles.length} slides]\n`;
+
+				for (const slidePath of slideFiles) {
+					const xmlString = await zip.file(slidePath).async("string");
+					const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+					
+					// Dans PowerPoint, le texte est dans les balises <a:t>
+					const textNodes = xmlDoc.getElementsByTagName("a:t");
+					
+					// On concatène le texte de la slide en ajoutant un espace entre les blocs
+					const slideText = Array.from(textNodes)
+						.map(node => node.textContent)
+						.join(" ")
+						.replace(/\s+/g, ' ') // Nettoie les espaces multiples
+						.trim();
+
+					const slideNum = slidePath.match(/\d+/)[0];
+					extractedText += `\n--- SLIDE ${slideNum} ---\n${slideText || "[Slide vide]"}\n`;
+				}
+				return extractedText;
+			}
+
+			return "File not supported by XML extraction.";
+		}
+	};
+
+
+    const tools = [
+        {
+            type: "function",
+            function: {
+                name: "list_files",
+                description: "List all files in the current directory.",
+                parameters: {
+                    type: "object",
+                    properties: { max_depth: { type: "integer", default: 2 } }
+                }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "read_file",
+                description: "Read content from a file.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        file_name: { type: "string" },
+                        start_line: { type: "integer", default: 1 },
+                        end_line: { type: "integer", default: -1 }
+                    },
+                    required: ["file_name"]
+                }
+            }
+        },
+        {
+            type: "function",
+            function: {
+                name: "parallel_analyze_content",
+                description: "Analyze multiple files or glob patterns in parallel.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        targets: { type: "array", items: { type: "string" } },
+                        prompt: { type: "string" }
+                    },
+                    required: ["targets", "prompt"]
+                }
+            }
+        },
+		{
+			type: "function",
+			function: {
+				name: "search_content",
+				description: "Search a text pattern inside files corresponding to a glob pattern (grep-like).",
+				parameters: {
+					type: "object",
+					properties: {
+						targets: { type: "array", items: { type: "string" }, description: "List of globs of pattern files (ex: ['*.txt', 'docs/*.pdf'])" },
+						query: { type: "string", description: "text or regex to search" },
+						case_sensitive: { type: "boolean", default: false }
+					},
+					required: ["targets", "query"]
+				}
+			}
+		}
+    ];
+
+    // --- TOOL EXECUTORS ---
+    const executors = {
+        async list_files({ max_depth = 2 }) {
+            if (!rootHandle) return "Error: No folder opened.";
+            const files = [];
+            async function scan(handle, path = "", depth = 0) {
+                if (depth > max_depth) return;
+                for await (const entry of handle.values()) {
+                    const rel = path + entry.name;
+                    files.push(rel + (entry.kind === 'directory' ? '/' : ''));
+                    if (entry.kind === 'directory') await scan(entry, rel + "/", depth + 1);
+                }
+            }
+            await scan(rootHandle);
+            return files.join("\n") || "No files found.";
+        },
+async read_file({ file_name, start_line = 1, end_line = -1 }) {
+    try {
+        if (!rootHandle) throw new Error("No Folder opened.");
+
+        // Path are written with /
+        const parts = file_name.split('/');
+        let currentHandle = rootHandle;
+
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (part === "" || part === ".") continue; 
+            currentHandle = await currentHandle.getDirectoryHandle(part);
+        }
+
+        const fileName = parts[parts.length - 1];
+        const handle = await currentHandle.getFileHandle(fileName);
+        const file = await handle.getFile();
+
+        // Reading with conversion
+        let text;
+        const ext = fileName.split('.').pop().toLowerCase();
+
+        if (typeof FileLib !== 'undefined') {
+            if (ext === 'pdf') {
+                text = await FileLib.pdfToText(await file.arrayBuffer());
+            } else if (['docx', 'pptx'].includes(ext)) {
+                text = await FileLib.getOfficeXML(await file.arrayBuffer(), ext);
+            } else {
+                text = await file.text();
+            }
+        } else {
+            text = await file.text();
+        }
+
+        // Pagination
+        const lines = text.split("\n");
+        const slice = lines.slice(start_line - 1, end_line === -1 ? undefined : end_line);
+        return slice.join("\n");
+
+    } catch (e) {
+        console.error(e);
+        return `Error reading "${file_name}": ${e.message}`;
+    }
+},
+async search_content({ targets, query, case_sensitive = false }) {
+    if (!rootHandle) return "Error: No folder opened.";
+    
+    const results = [];
+    const flags = case_sensitive ? "g" : "gi";
+    const regex = new RegExp(query, flags);
+
+    // --- Étape 1 : Trouver tous les fichiers correspondant aux globs ---
+    let matchingFiles = [];
+    
+    async function findFiles(handle, currentPath = "") {
+        for await (const entry of handle.values()) {
+            const relPath = currentPath + entry.name;
+            if (entry.kind === 'file') {
+                const isMatch = targets.some(target => {
+                    const pattern = target
+                        .replace(/\./g, '\\.')
+                        .replace(/\*\*/g, '(.+)')
+                        .replace(/\*/g, '[^/]+');
+                    return new RegExp('^' + pattern + '$', 'i').test(relPath);
+                });
+                if (isMatch) matchingFiles.push(relPath);
+            } else if (entry.kind === 'directory') {
+                await findFiles(entry, relPath + "/");
+            }
+        }
+    }
+
+    await findFiles(rootHandle);
+
+    if (matchingFiles.length === 0) return "No files matches pattern";
+
+    // --- Étape 2 : Chercher dans le contenu de chaque fichier ---
+    for (const filePath of matchingFiles) {
+        try {
+            // On utilise read_file pour profiter des conversions PDF/Office/XML
+            const content = await this.read_file({ file_name: filePath });
+            const lines = content.split('\n');
+
+            lines.forEach((lineContent, index) => {
+                if (regex.test(lineContent)) {
+                    results.push({
+                        file: filePath,
+                        line: index + 1,
+                        content: lineContent.trim()
+                    });
+                }
+                // Reset de l'index regex si global
+                regex.lastIndex = 0;
+            });
+        } catch (err) {
+            console.error(`Error during search in ${filePath}:`, err);
+        }
+        
+        // Limite de sécurité pour ne pas saturer le contexte de l'IA
+        if (results.length > 100) break;
+    }
+
+    // --- Étape 3 : Formater la réponse ---
+    if (results.length === 0) return `Aucune occurrence de "${query}" trouvée.`;
+
+    let output = `Search result for "${query}" (${results.length} occurrences) :\n\n`;
+    results.forEach(res => {
+        output += `📍 ${res.file}:${res.line}\n   > ${res.content}\n\n`;
+    });
+
+    if (results.length > 100) output += "... (truncated to 100)";
+    
+    return output;
+},
+async parallel_analyze_content({ targets, prompt }) {
+    if (!rootHandle) return "Error no Folder opened";
+    
+    let allFiles = [];
+
+    // 1. Fonction récursive pour trouver tous les fichiers et leurs chemins relatifs
+    async function findFilesRecursively(handle, currentPath = "") {
+        for await (const entry of handle.values()) {
+            const relPath = currentPath + entry.name;
+            if (entry.kind === 'file') {
+                // Vérification si le fichier correspond à l'un des patterns glob
+                const isMatch = targets.some(target => {
+                    // Conversion simple de glob en Regex (gère les sous-dossiers et *)
+                    const regexPath = target
+                        .replace(/\./g, '\\.') // Échappe les points
+                        .replace(/\*\*/g, '(.+)') // ** pour récursivité profonde
+                        .replace(/\*/g, '[^/]+'); // * pour un niveau de dossier
+                    const regex = new RegExp('^' + regexPath + '$', 'i');
+                    return regex.test(relPath);
+                });
+                if (isMatch) allFiles.push(relPath);
+            } else if (entry.kind === 'directory') {
+                await findFilesRecursively(entry, relPath + "/");
+            }
+        }
+    }
+
+    await findFilesRecursively(rootHandle);
+
+    if (allFiles.length === 0) {
+        return `Aucun fichier trouvé pour les cibles : ${targets.join(', ')}. Vérifiez que vous avez ouvert le bon dossier racine.`;
+    }
+
+
+    const WORD_CHUNK_SIZE = 10000; // 10k mots
+    const WORD_OVERLAP = 100;    // 100 mots d'overlap
+    let analysisTasks = [];
+
+    // 2. Traitement de chaque fichier trouvé
+    for (const filePath of allFiles) {
+        try {
+            // Lecture du fichier via l'exécuteur existant (gère PDF/Office)
+            const content = await this.read_file({ file_name: filePath });
+            
+            // Découpage en mots
+            const words = content.split(/\s+/).filter(w => w.length > 0);
+            
+            if (words.length === 0) continue;
+
+            // Création des chunks par mots
+            for (let i = 0; i < words.length; i += (WORD_CHUNK_SIZE - WORD_OVERLAP)) {
+                const chunkText = words.slice(i, i + WORD_CHUNK_SIZE).join(" ");
+                const chunkInfo = `[Fichier: ${filePath} | Mots: ${i} à ${i + WORD_CHUNK_SIZE}]`;
+
+                // Création de la tâche API
+                const task = (async () => {
+                    const response = await fetch(document.getElementById('apiAddress').value, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${document.getElementById('apiKey').value}`
+                        },
+                        body: JSON.stringify({
+                            model: document.getElementById('apiModel')?.value || 'mistral',
+                            messages: [
+                                { role: "system", content: "Vous êtes un analyseur de code expert. Répondez de manière concise." },
+                                { role: "user", content: `Analyse ce segment de code/document.\nObjectif : ${prompt}\n\n${chunkInfo}\n\nCONTENU :\n${chunkText}` }
+                            ]
+                        })
+                    });
+
+                    if (!response.ok) return `Erreur sur ${chunkInfo}: ${response.statusText}`;
+                    const data = await response.json();
+                    return `### Analyse de ${filePath} (Segment ${i})\n${data.choices[0].message.content}`;
+                })();
+
+                analysisTasks.push(task);
+                
+                // Limite de sécurité pour éviter d'exploser le quota API ou la mémoire
+                if (analysisTasks.length >= 30) {
+                    console.log("30 chunks limit reached");
+                    break;
+                }
+            }
+        } catch (err) {
+			console.error(err.message); 
+            analysisTasks.push(Promise.resolve(`Error reading ${filePath}: ${err.message}`));
+        }
+    }
+
+
+    // 3. Exécution parallèle et concaténation
+    const results = await Promise.all(analysisTasks);
+    return results.join("\n\n---\n\n");
+}
+    };
+
+    // --- AGENT LOOP ---
+    async function sendMessage() {
+        if (isLoading) return;
+        const input = document.getElementById('userInput');
+        const message = input.value.trim();
+        if (!message) return;
+
+        const apiAddress = document.getElementById('apiAddress').value + "/chat/completions";
+        const apiKey = document.getElementById('apiKey').value;
+        const model = document.getElementById('modelName').value;
+
+        if (!apiKey) { addMessage('API Key required!', 'error'); return; }
+
+        addMessage(message, 'user');
+		console.log(message)
+        conversationHistory.push({ role: 'user', content: message });
+        input.value = '';
+        isLoading = true;
+        document.getElementById('sendBtn').disabled = true;
+
+        try {
+            let loop = true;
+            while (loop) {
+                showTypingIndicator();
+                const response = await fetch(apiAddress, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ model: model, messages: conversationHistory, tools: tools })
+                });
+
+                removeTypingIndicator();
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                const assistantMsg = data.choices[0].message;
+
+                if (assistantMsg.tool_calls) {
+                    console.log(assistantMsg);
+                    conversationHistory.push(assistantMsg);
+                    for (const call of assistantMsg.tool_calls) {
+                        const name = call.function.name;
+                        const args = JSON.parse(call.function.arguments);
+                        
+                        addToolCall(`Calling: ${name}(${Object.values(args).join(', ')})`);
+                        const result = await executors[name](args);
+                        console.log(result);
+                        conversationHistory.push({
+                            role: "tool",
+                            tool_call_id: call.id,
+                            name: name,
+                            content: String(result)
+                        });
+                    }
+                    // Continuer la boucle pour que l'IA traite les résultats des outils
+                } else {
+                    console.log(assistantMsg);
+                    conversationHistory.push(assistantMsg);
+                    addMessage(assistantMsg.content, 'assistant', assistantMsg.content);
+                    loop = false;
+                }
+            }
+        } catch (error) {
+            removeTypingIndicator();
+			console.error(error.message); 
+            addMessage(`Error: ${error.message}`, 'error');
+        } finally {
+            isLoading = false;
+            document.getElementById('sendBtn').disabled = false;
+            input.focus();
+        }
+    }
+
+    // --- UI HELPERS ---
+    function addMessage(content, role, rawContent = null) {
+        const container = document.getElementById('chatContainer');
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        if (role === 'assistant') {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = marked.parse(content || "");
+            wrapper.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+				
+			// Add more styling to lists
+			wrapper.querySelectorAll('ul, ol').forEach(list => {
+				list.classList.add('pretty-list');
+			});
+		
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-button';
+            copyBtn.innerHTML = '📋 Copy';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(rawContent || content);
+                copyBtn.innerHTML = '✓ Copied!';
+                setTimeout(() => copyBtn.innerHTML = '📋 Copy', 2000);
+            };
+            contentDiv.appendChild(wrapper);
+            contentDiv.appendChild(copyBtn);
+        } else {
+            contentDiv.textContent = content;
+        }
+
+        div.appendChild(contentDiv);
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function addToolCall(text) {
+        const container = document.getElementById('chatContainer');
+        const div = document.createElement('div');
+        div.className = 'message tool';
+        div.innerHTML = `<div class="tool-content">⚙️ ${text}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+        const div = document.createElement('div');
+        div.className = 'message assistant';
+        div.id = 'typingIndicator';
+        div.innerHTML = '<div class="typing-indicator message-content"><span></span><span></span><span></span></div>';
+        document.getElementById('chatContainer').appendChild(div);
+    }
+
+    function removeTypingIndicator() {
+        const el = document.getElementById('typingIndicator');
+        if (el) el.remove();
+    }
+
+    function handleKeyPress(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+    document.getElementById('userInput').focus();
+</script>
+</body>
+</html>
